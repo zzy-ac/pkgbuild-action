@@ -1,30 +1,30 @@
 # Maintainer: Eric Langlois <eric@langlois.xyz>
-pkgname=(helloworld hw)
+pkgname=(aurvote-version)
 pkgver=1.0.0
 pkgrel=1
-pkgdesc="Hello World"
+pkgdesc="Prints the version of aurvote"
 url="http://www.example.com"
 arch=('any')
 license=('MIT')
-depends=(python)
+depends=(bash aurvote)
 checkdepends=()
 makedepends=()
-source=(helloworld.py)
-sha256sums=('61b911f2d8b9e9f52e512aa7e273240cbd26bcaf0a5cae4abed5a7a53fdde6e7')
+source=(aurvote-version.sh LICENSE)
+sha256sums=(
+	'082e4952418f5855fadef75abcc45cf980aab7e70f4583b44e5dc08ce90ab2e7'
+	'943b0a306fec2cbb9368f82d363a1165d26b49dbfef9065c61633a8abeb14027'
+)
 
 build() {
-	cp helloworld.py helloworld
-	chmod u+x helloworld
+	cp aurvote-version.sh aurvote-version
+	chmod u+x aurvote-version
 }
 
 check() {
-	./helloworld
+	./aurvote-version
 }
 
-package_helloworld() {
-	install -m755 -D "helloworld" "$pkgdir/usr/bin/helloworld"
-}
-
-package_hw() {
-	install -m755 -D "helloworld" "$pkgdir/usr/bin/hw"
+package() {
+	install -m755 -D "aurvote-version" "$pkgdir/usr/bin/aurvote-version"
+	install -Dm644 "LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }

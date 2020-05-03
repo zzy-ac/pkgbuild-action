@@ -1,0 +1,16 @@
+pkgbase = aurvote-version
+	pkgdesc = Prints the version of aurvote
+	pkgver = 1.0.0
+	pkgrel = 1
+	url = http://www.example.com
+	arch = any
+	license = MIT
+	depends = bash
+	depends = aurvote
+	source = aurvote-version
+	source = LICENSE
+	sha256sums = 082e4952418f5855fadef75abcc45cf980aab7e70f4583b44e5dc08ce90ab2e7
+	sha256sums = 943b0a306fec2cbb9368f82d363a1165d26b49dbfef9065c61633a8abeb14027
+
+pkgname = aurvote-version
+
