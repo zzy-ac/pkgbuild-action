@@ -20,6 +20,7 @@ useradd builder -m
 # Give user `builder` passwordless sudo access
 echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
+export PATH="/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin"
 echo "PWD=$PWD"
 echo "root PATH=$PATH"
 sudo -H -u builder bash -c 'echo "builder PATH=$PATH"'
