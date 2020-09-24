@@ -21,6 +21,6 @@ check() {
 	./bonjour
 }
 
-package_helloworld() {
+package() {
 	install -m755 -D "bonjour" "$pkgdir/usr/bin/bonjour"
 }
