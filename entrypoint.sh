@@ -20,6 +20,10 @@ useradd builder -m
 # Give user `builder` passwordless sudo access
 echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
+echo "PWD=$PWD"
+echo "root PATH=$PATH"
+sudo -H -u builder bash -c 'builder PATH=$PATH'
+
 # Give all users (particularly builder) full access to these files
 chmod -R a+rw .
 
