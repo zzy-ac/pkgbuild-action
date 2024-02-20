@@ -14,8 +14,6 @@ pacman-key --init
 sudo pacman-key --lsign-key "farseerfc@archlinux.org"
 pacman -Sy --noconfirm && pacman -S  --noconfirm archlinuxcn-keyring 
 
-pacman -S --noconfirm paru at-spi2-core
-
 pacman -Syu --noconfirm --needed base-devel
 
 # Makepkg does not allow running as root
