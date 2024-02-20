@@ -7,7 +7,14 @@ FILE="$(basename "$0")"
 cat << EOM >> /etc/pacman.conf
 [multilib]
 Include = /etc/pacman.d/mirrorlist
+[archlinuxcn]
+Server = https://repo.archlinuxcn.org/x86_64
 EOM
+pacman-key --init
+sudo pacman-key --lsign-key "farseerfc@archlinux.org"
+pacman -Sy --noconfirm && pacman -S  --noconfirm archlinuxcn-keyring 
+
+pacman -S --noconfirm paru at-spi2-core
 
 pacman -Syu --noconfirm --needed base-devel
 
