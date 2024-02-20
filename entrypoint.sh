@@ -3,7 +3,7 @@ set -euo pipefail
 
 FILE="$(basename "$0")"
 
-# Enable the multilib repository
+# 启用 multilib 仓库
 cat << EOM >> /etc/pacman.conf
 [multilib]
 Include = /etc/pacman.d/mirrorlist
@@ -12,118 +12,115 @@ Server = https://repo.archlinuxcn.org/x86_64
 EOM
 pacman-key --init
 pacman-key --lsign-key "farseerfc@archlinux.org"
-pacman -Sy --noconfirm && pacman -S  --noconfirm archlinuxcn-keyring 
+pacman -Sy --noconfirm && pacman -S --noconfirm archlinuxcn-keyring 
 
 pacman -Syu --noconfirm --needed base-devel
 
-# Makepkg does not allow running as root
-# Create a new user `builder`
-# `builder` needs to have a home directory because some PKGBUILDs will try to
-# write to it (e.g. for cache)
+# Makepkg 不允许以 root 身份运行
+# 创建一个新用户 `builder`
+# `builder` 需要有一个家目录，因为某些 PKGBUILD 将尝试向其写入（例如，用于缓存）
 useradd builder -m
-# When installing dependencies, makepkg will use sudo
-# Give user `builder` passwordless sudo access
+# 在安装依赖时，makepkg 将使用 sudo
+# 让用户 `builder` 具有无密码 sudo 访问权限
 echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
-# Give all users (particularly builder) full access to these files
+# 让所有用户（特别是 builder）都可以完全访问这些文件
 chmod -R a+rw .
 
 BASEDIR="$PWD"
 cd "${INPUT_PKGDIR:-.}"
 
-# Assume that if .SRCINFO is missing then it is generated elsewhere.
-# AUR checks that .SRCINFO exists so a missing file can't go unnoticed.
+# 假设如果 .SRCINFO 不存在，则是在其他地方生成的。
+# AUR 检查 .SRCINFO 是否存在，因此不能忽略丢失的文件。
 if [ -f .SRCINFO ] && ! sudo -u builder makepkg --printsrcinfo | diff - .SRCINFO; then
-	echo "::error file=$FILE,line=$LINENO::Mismatched .SRCINFO. Update with: makepkg --printsrcinfo > .SRCINFO"
-	exit 1
+    echo "::error file=$FILE,line=$LINENO::Mismatched .SRCINFO. Update with: makepkg --printsrcinfo > .SRCINFO"
+    exit 1
 fi
 
-# Optionally install dependencies from AUR
+# 如果存在 INPUT_AURDEPS，则从 AUR 安装依赖
 if [ -n "${INPUT_AURDEPS:-}" ]; then
-	# First install yay
-	pacman -S --noconfirm --needed git
-	git clone https://aur.archlinux.org/yay-bin.git /tmp/yay
-	pushd /tmp/yay
-	chmod -R a+rw .
-	sudo -H -u builder makepkg --syncdeps --install --noconfirm
-	popd
+    # 首先安装 yay
+    pacman -S --noconfirm --needed git
+    git clone https://aur.archlinux.org/yay-bin.git /tmp/yay
+    pushd /tmp/yay
+    chmod -R a+rw .
+    sudo -H -u builder makepkg --syncdeps --install --noconfirm
+    popd
 
-	# Extract dependencies from .SRCINFO (depends or depends_x86_64) and install
-	mapfile -t PKGDEPS < \
-		<(sed -n -e 's/^[[:space:]]*\(make\)\?depends\(_x86_64\)\? = \([[:alnum:][:punct:]]*\)[[:space:]]*$/\3/p' .SRCINFO)
-	sudo -H -u builder yay --sync --noconfirm "${PKGDEPS[@]}"
+    # 从 .SRCINFO 中提取依赖关系并安装
+    mapfile -t PKGDEPS < \
+        <(sudo -u builder makepkg --printsrcinfo | sed -n -e 's/^[[:space:]]*\(make\)\?depends\(_x86_64\)\? = \([[:alnum:][:punct:]]*\)[[:space:]]*$/\3/p')
+    sudo -H -u builder yay --sync --noconfirm "${PKGDEPS[@]}"
 fi
 
-# Make the builder user the owner of these files
-# Without this, (e.g. only having every user have read/write access to the files),
-# makepkg will try to change the permissions of the files itself which will fail since it does not own the files/have permission
-# we can't do this earlier as it will change files that are for github actions, which results in warnings in github actions logs.
+# 将 builder 用户设置为这些文件的所有者
+# 没有这个，（例如，只允许每个用户对文件进行读/写访问），
+# makepkg 将尝试更改文件的权限，这将失败，因为它不拥有文件/具有权限
+# 我们不能更早地这样做，因为它将更改 github actions 的文件，这会导致 github actions 日志中的警告。
 chown -R builder .
 
-# Build packages
-# INPUT_MAKEPKGARGS is intentionally unquoted to allow arg splitting
+# 构建包
+# INPUT_MAKEPKGARGS 是故意未引用的，以允许参数分割
 # shellcheck disable=SC2086
 sudo -H -u builder makepkg --syncdeps --noconfirm ${INPUT_MAKEPKGARGS:-}
 
-# Get array of packages to be built
-mapfile -t PKGFILES < <( sudo -u builder makepkg --packagelist )
+# 获取要构建的包数组
+mapfile -t PKGFILES < <(sudo -u builder makepkg --packagelist)
 echo "Package(s): ${PKGFILES[*]}"
 
-# Report built package archives
+# 报告构建的包档案
 i=0
 for PKGFILE in "${PKGFILES[@]}"; do
-	# makepkg reports absolute paths, must be relative for use by other actions
-	RELPKGFILE="$(realpath --relative-base="$BASEDIR" "$PKGFILE")"
-	# Caller arguments to makepkg may mean the pacakge is not built
-	if [ -f "$PKGFILE" ]; then
-		echo "::set-output name=pkgfile$i::$RELPKGFILE"
-	else
-		echo "Archive $RELPKGFILE not built"
-	fi
-	(( ++i ))
+    # makepkg 报告绝对路径，必须对其他操作者设置为相对路径
+    RELPKGFILE="$(realpath --relative-base="$BASEDIR" "$PKGFILE")"
+    # 调用者参数对 makepkg 可能意味着未构建包
+    if [ -f "$PKGFILE" ]; then
+        echo "::set-output name=pkgfile$i::$RELPKGFILE"
+    else
+        echo "Archive $RELPKGFILE not built"
+    fi
+    (( ++i ))
 done
 
 function prepend () {
-	# Prepend the argument to each input line
-	while read -r line; do
-		echo "$1$line"
-	done
+    # 在每个输入行之前添加参数
+    while read -r line; do
+        echo "$1$line"
+    done
 }
 
 function namcap_check() {
-	# Run namcap checks
-	# Installing namcap after building so that makepkg happens on a minimal
-	# install where any missing dependencies can be caught.
-	pacman -S --noconfirm --needed namcap
+    # 运行 namcap 检查
+    # 在构建之后安装 namcap，以便在可以捕获任何缺少的依赖项的最小安装上进行 makepkg。
+    pacman -S --noconfirm --needed namcap
 
-	NAMCAP_ARGS=()
-	if [ -n "${INPUT_NAMCAPRULES:-}" ]; then
-		NAMCAP_ARGS+=( "-r" "${INPUT_NAMCAPRULES}" )
-	fi
-	if [ -n "${INPUT_NAMCAPEXCLUDERULES:-}" ]; then
-		NAMCAP_ARGS+=( "-e" "${INPUT_NAMCAPEXCLUDERULES}" )
-	fi
+    NAMCAP_ARGS=()
+    if [ -n "${INPUT_NAMCAPRULES:-}" ]; then
+        NAMCAP_ARGS+=( "-r" "${INPUT_NAMCAPRULES}" )
+    fi
+    if [ -n "${INPUT_NAMCAPEXCLUDERULES:-}" ]; then
+        NAMCAP_ARGS+=( "-e" "${INPUT_NAMCAPEXCLUDERULES}" )
+    fi
 
-	# For reasons that I don't understand, sudo is not resetting '$PATH'
-	# As a result, namcap finds program paths in /usr/sbin instead of /usr/bin
-	# which makes namcap fail to identify the packages that provide the
-	# program and so it emits spurious warnings.
-	# More details: https://bugs.archlinux.org/task/66430
-	#
-	# Work around this issue by putting bin ahead of sbin in $PATH
-	export PATH="/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin"
+    # 由于某些原因，sudo 未重置 '$PATH'
+    # 结果，namcap 找到的程序路径位于 /usr/sbin 而不是 /usr/bin
+    # 这使得 namcap 无法识别提供程序的软件包，从而导致 namcap 无法识别软件包并因此发出虚假警告。
+    # 更多细节：https://bugs.archlinux.org/task/66430
+    #
+    # 通过在 $PATH 中放置 bin，使得其在 sbin 之前，来解决这个问题
+    export PATH="/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin"
 
-	namcap "${NAMCAP_ARGS[@]}" PKGBUILD \
-		| prepend "::warning file=$FILE,line=$LINENO::"
-	for PKGFILE in "${PKGFILES[@]}"; do
-		if [ -f "$PKGFILE" ]; then
-			RELPKGFILE="$(realpath --relative-base="$BASEDIR" "$PKGFILE")"
-			namcap "${NAMCAP_ARGS[@]}" "$PKGFILE" \
-				| prepend "::warning file=$FILE,line=$LINENO::$RELPKGFILE:"
-		fi
-	done
+    namcap "${NAMCAP_ARGS[@]}" PKGBUILD \
+        | prepend "::warning file=$FILE,line=$LINENO::"
+    for PKGFILE in "${PKGFILES[@]}"; do
+        if [ -f "$PKGFILE" ]; then
+            RELPKGFILE="$(realpath --relative-base="$BASEDIR" "$PKGFILE")"
+            namcap "${NAMCAP_ARGS[@]}" "$PKGFILE" \
+                | prepend "::warning file=$FILE,line=$LINENO::$RELPKGFILE:"
+        fi
+    done
 }
 
 if [ -z "${INPUT_NAMCAPDISABLE:-}" ]; then
-	namcap_check
+    namcap_check
 fi
