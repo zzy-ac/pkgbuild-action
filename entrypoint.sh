@@ -11,7 +11,7 @@ Include = /etc/pacman.d/mirrorlist
 Server = https://repo.archlinuxcn.org/x86_64
 EOM
 pacman-key --init
-sudo pacman-key --lsign-key "farseerfc@archlinux.org"
+pacman-key --lsign-key "farseerfc@archlinux.org"
 pacman -Sy --noconfirm && pacman -S  --noconfirm archlinuxcn-keyring 
 
 pacman -Syu --noconfirm --needed base-devel
